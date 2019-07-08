@@ -551,6 +551,7 @@ uint16_t MifareClassicAppProcess(uint8_t* Buffer, uint16_t BitCount)
             }
             return BitCount;
         } else {
+            //todo: check HALT command
             /* Unknown command. Enter HALT state. */
             State = STATE_HALT;
         }
@@ -572,6 +573,7 @@ uint16_t MifareClassicAppProcess(uint8_t* Buffer, uint16_t BitCount)
 	       }
 		   return BitCount;
 	    } else {
+          //todo: check HALT command
           /* Unknown command. Enter HALT state. */
           State = STATE_HALT;
         }
@@ -650,9 +652,10 @@ uint16_t MifareClassicAppProcess(uint8_t* Buffer, uint16_t BitCount)
             Buffer[0] = NAK_NOT_AUTHED;
             return ACK_NAK_FRAME_SIZE;
         } else {
-            /* Unknown command. Enter HALT state. */
+            /* Unknown command. Enter IDLE state. */
             State = STATE_IDLE;
-            return ISO14443A_APP_NO_RESPONSE;
+            Buffer[0] = NAK_NOT_AUTHED;
+            return ACK_NAK_FRAME_SIZE;
         }
         break;
 
@@ -682,6 +685,8 @@ uint16_t MifareClassicAppProcess(uint8_t* Buffer, uint16_t BitCount)
         } else {
             /* Just reset on authentication error. */
             State = STATE_IDLE;
+            Buffer[0] = NAK_NOT_AUTHED ^ Crypto1Nibble();
+            return ACK_NAK_FRAME_SIZE;
         }
 
         break;
@@ -810,6 +815,7 @@ uint16_t MifareClassicAppProcess(uint8_t* Buffer, uint16_t BitCount)
                 return ACK_NAK_FRAME_SIZE;
             }
         } else {
+            //todo: check HALT command
             /* Unknown command. Enter HALT state */
             State = STATE_IDLE;
         }
