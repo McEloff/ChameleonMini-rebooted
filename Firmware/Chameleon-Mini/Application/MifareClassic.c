@@ -256,8 +256,7 @@ static enum {
     STATE_IDLE,
     STATE_CHINESE_IDLE,
     STATE_CHINESE_WRITE,
-    STATE_READY1,
-	STATE_READY2,
+    STATE_READY,
     STATE_ACTIVE,
     STATE_AUTHING,
     STATE_AUTHED_IDLE,
@@ -431,7 +430,7 @@ uint16_t MifareClassicAppProcess(uint8_t* Buffer, uint16_t BitCount)
 
         if (ISO14443AWakeUp(Buffer, &BitCount, CardATQAValue, FromHalt)) {
             AccessAddress = 0xff;
-            State = STATE_READY1;
+            State = STATE_READY;
             return BitCount;
         }
     }
@@ -441,7 +440,7 @@ uint16_t MifareClassicAppProcess(uint8_t* Buffer, uint16_t BitCount)
     case STATE_HALT:
 
         if (ISO14443AWakeUp(Buffer, &BitCount, CardATQAValue, true)) {
-            State = STATE_READY1;
+            State = STATE_READY;
             return BitCount;
         }
 #ifdef SUPPORT_MF_CLASSIC_MAGIC_MODE
@@ -527,10 +526,27 @@ uint16_t MifareClassicAppProcess(uint8_t* Buffer, uint16_t BitCount)
         return ACK_NAK_FRAME_SIZE;
 #endif
 
-    case STATE_READY1:
+    case STATE_READY:
         if (ISO14443AWakeUp(Buffer, &BitCount, CardATQAValue, false)) {
-            State = STATE_READY1;
+            State = STATE_READY;
             return BitCount;
+        } else if (Buffer[0] == CMD_HALT) {
+            /* Halts the tag. According to the ISO14443, the second
+            * byte is supposed to be 0. */
+            if (Buffer[1] == 0) {
+                if (ISO14443ACheckCRCA(Buffer, CMD_HALT_FRAME_SIZE)) {
+                    /* According to ISO14443, we must not send anything
+                    * in order to acknowledge the HALT command. */
+                    State = STATE_HALT;
+                    return ISO14443A_APP_NO_RESPONSE;
+                } else {
+                    Buffer[0] = NAK_CRC_ERROR;
+                    return ACK_NAK_FRAME_SIZE;
+                }
+            } else {
+                Buffer[0] = NAK_INVALID_ARG;
+                return ACK_NAK_FRAME_SIZE;
+            }
         } else if (Buffer[0] == ISO14443A_CMD_SELECT_CL1) {
             /* Load UID CL1 and perform anticollision */
             uint8_t UidCL1[ISO14443A_CL_UID_SIZE];
@@ -540,7 +556,7 @@ uint16_t MifareClassicAppProcess(uint8_t* Buffer, uint16_t BitCount)
 	            UidCL1[0] = ISO14443A_UID0_CT;
 
 	            if (ISO14443ASelect(Buffer, &BitCount, UidCL1, SAK_CL1_VALUE))
-				    State = STATE_READY2;
+				    State = STATE_READY;
 
 	        } else {
                 MemoryReadBlock(UidCL1, MEM_UID_CL1_ADDRESS, MEM_UID_CL1_SIZE);
@@ -550,17 +566,6 @@ uint16_t MifareClassicAppProcess(uint8_t* Buffer, uint16_t BitCount)
                 }
             }
             return BitCount;
-        } else {
-            //todo: check HALT command
-            /* Unknown command. Enter HALT state. */
-            State = STATE_HALT;
-        }
-        break;
-
-    case STATE_READY2:
-        if (ISO14443AWakeUp(Buffer, &BitCount, CardATQAValue, false)) {
-	       State = STATE_READY1;
-	       return BitCount;
 	    } else if (Buffer[0] == ISO14443A_CMD_SELECT_CL2) {
 
 	       /* Load UID CL2 and perform anticollision */
@@ -572,19 +577,19 @@ uint16_t MifareClassicAppProcess(uint8_t* Buffer, uint16_t BitCount)
 		       State = STATE_ACTIVE;
 	       }
 		   return BitCount;
-	    } else {
-          //todo: check HALT command
-          /* Unknown command. Enter HALT state. */
-          State = STATE_HALT;
+        } else {
+            /* Unknown command. Enter HALT state. */
+            State = STATE_HALT;
+            Buffer[0] = NAK_NOT_AUTHED;
+            return ACK_NAK_FRAME_SIZE;
         }
-    break;
+        break;
 
     case STATE_ACTIVE:
         if (ISO14443AWakeUp(Buffer, &BitCount, CardATQAValue, false)) {
-            State = STATE_READY1;
+            State = STATE_READY;
             return BitCount;
         } else if (Buffer[0] == CMD_HALT) {
-
             /* Halts the tag. According to the ISO14443, the second
             * byte is supposed to be 0. */
             if (Buffer[1] == 0) {
@@ -753,7 +758,7 @@ uint16_t MifareClassicAppProcess(uint8_t* Buffer, uint16_t BitCount)
                 Buffer[0] = NAK_CRC_ERROR ^ Crypto1Nibble();
             }
             return ACK_NAK_FRAME_SIZE;
-        }else if (Buffer[0] == CMD_TRANSFER) {
+        } else if (Buffer[0] == CMD_TRANSFER) {
             /* Write back the global block buffer to the desired block address */
             if (ISO14443ACheckCRCA(Buffer, CMD_TRANSFER_FRAME_SIZE)) {
                 if (!ActiveConfiguration.ReadOnly) {
@@ -814,10 +819,28 @@ uint16_t MifareClassicAppProcess(uint8_t* Buffer, uint16_t BitCount)
                 Buffer[0] = NAK_CRC_ERROR ^ Crypto1Nibble();
                 return ACK_NAK_FRAME_SIZE;
             }
+        } else if (Buffer[0] == CMD_HALT) {
+            /* Halts the tag. According to the ISO14443, the second
+            * byte is supposed to be 0. */
+            if (Buffer[1] == 0) {
+                if (ISO14443ACheckCRCA(Buffer, CMD_HALT_FRAME_SIZE)) {
+                    /* According to ISO14443, we must not send anything
+                    * in order to acknowledge the HALT command. */
+                    State = STATE_HALT;
+                    return ISO14443A_APP_NO_RESPONSE;
+                } else {
+                    Buffer[0] = NAK_CRC_ERROR ^ Crypto1Nibble();
+                    return ACK_NAK_FRAME_SIZE;
+                }
+            } else {
+                Buffer[0] = NAK_INVALID_ARG ^ Crypto1Nibble();
+                return ACK_NAK_FRAME_SIZE;
+            }
         } else {
-            //todo: check HALT command
-            /* Unknown command. Enter HALT state */
+            /* Unknown command. Enter IDLE state */
             State = STATE_IDLE;
+            Buffer[0] = NAK_NOT_AUTHED ^ Crypto1Nibble();
+            return ACK_NAK_FRAME_SIZE;
         }
 
         break;
