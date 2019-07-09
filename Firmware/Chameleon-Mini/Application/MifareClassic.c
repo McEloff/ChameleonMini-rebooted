@@ -690,8 +690,6 @@ uint16_t MifareClassicAppProcess(uint8_t* Buffer, uint16_t BitCount)
         } else {
             /* Just reset on authentication error. */
             State = STATE_IDLE;
-            Buffer[0] = NAK_NOT_AUTHED ^ Crypto1Nibble();
-            return ACK_NAK_FRAME_SIZE;
         }
 
         break;
