@@ -1,4 +1,4 @@
-/* Copyright 2013 Timo Kasper, Simon Küppers, David Oswald ("ORIGINAL
+﻿/* Copyright 2013 Timo Kasper, Simon Küppers, David Oswald ("ORIGINAL
  * AUTHORS"). All rights reserved.
  *
  * DEFINITIONS:
@@ -65,7 +65,7 @@
 #define FIRMWARE_VERSION_MAJOR			1
 #define FIRMWARE_VERSION_MINOR 			3
 #define FIRMWARE_NAME					"Rebooted"
-#define FIRMWARE_FORK_AUTHOR			"Iceman"
+#define FIRMWARE_FORK_AUTHOR			"Iceman/Eloff"
 
 #define COMMAND_INFO_OK_ID              100
 #define COMMAND_INFO_OK                 "OK"
